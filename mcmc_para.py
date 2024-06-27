@@ -68,7 +68,7 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
 
 
             # doing DEM calculation
-            dem0,edem0,elogt0,chisq0,dn_reg0=dn2dem(np.array(mcmc_intensity),np.array(mcmc_int_error),mcmc_emis_sorted,logt_interp,temps)
+            dem0,edem0,elogt0,chisq0,dn_reg0=dn2dem(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp,temps)
 
             chi2 = calc_chi2(mcmc_intensity, mcmc_int_error, dem0, mcmc_emis_sorted, logt_interp)
             dem_results.append(dem0)
