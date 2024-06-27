@@ -17,6 +17,8 @@ from demcmc import (
 )
 from demcmc.units import u_temp, u_dem
 from mcmc.mcmc_utils import calc_chi2, mcmc_process
+from demregpy import dn2dem
+import demregpy
 
 
 def check_dem_exists(filename: str) -> bool:
@@ -50,23 +52,26 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
             emis_sorted = a.emis_filter(emis, linenames, Lines)
             mcmc_lines = []
 
-            for ind, line in enumerate(Lines):
-                if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 30):
-                    mcmc_emis = ContFuncDiscrete(logt_interp*u.K, interp_emis_temp(emis_sorted[ind, :]) * u.cm ** 5 / u.K,
-                                                name=line)
-                    mcmc_intensity = Intensity[ypix, xpix, ind]
-                    mcmc_int_error = Int_error[ypix, xpix,ind]+Intensity[ypix, xpix,ind]*0.23
-                    emissionLine = EmissionLine(
-                        mcmc_emis,
-                        intensity_obs=mcmc_intensity,
-                        sigma_intensity_obs=mcmc_int_error,
-                        name=line
-                    )
-                    mcmc_lines.append(emissionLine)
+            mcmc_intensity = []
+            mcmc_int_error = []
+            mcmc_emis_sorted = []
+            dlogt = logt_interp[1]-logt_interp[0]
+            temps=10**np.arange(np.min(logt_interp),np.max(logt_interp)+dlogt,dlogt)
 
-            dem_median = mcmc_process(mcmc_lines, temp_bins) # Run 2 MCMC processes and return the median DEM
-            chi2 = calc_chi2(mcmc_lines, dem_median, temp_bins)
-            dem_results.append(dem_median)
+
+            for ind, line in enumerate(Lines):
+                if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 10):
+                    mcmc_intensity.append(Intensity[ypix, xpix, ind])
+                    mcmc_int_error.append(Int_error[ypix, xpix,ind]+Intensity[ypix, xpix,ind]*0.23)
+                    mcmc_emis_sorted.append(emis_sorted[ind, :])
+                    mcmc_lines.append(line)
+
+
+            # doing DEM calculation
+            dem0,edem0,elogt0,chisq0,dn_reg0=dn2dem(mcmc_intensity,mcmc_int_error,mcmc_emis_sorted,logt_interp,temps)
+
+            chi2 = calc_chi2(mcmc_intensity, mcmc_int_error, dem0, mcmc_emis_sorted, logt_interp)
+            dem_results.append(dem0)
             chi2_results.append(chi2)
             ycoords_out.append(ypix)
             linenames_list.append(mcmc_lines)
@@ -125,16 +130,34 @@ def process_data(filename: str, num_processes: int) -> None:
     
     return f'{a.outdir}/{a.outdir.split("/")[-1]}_dem_combined.npz'
 
-def pred_intensity_compact(emis:np.array, logt:np.array, linename:str, dem:np.array) -> float:
-    mcmc_emis = ContFuncDiscrete(logt*u.K, interp_emis_temp(emis) * u.cm ** 5 / u.K,
-                                name=linename)
-    emissionLine = EmissionLine(
-        mcmc_emis,
-        name=linename
-    )
-    temp_bins = TempBins(logt * u.K)
-    return emissionLine._I_pred(temp_bins, dem)
-
+def pred_intensity_compact(emis: np.array, logt: np.array, dem: np.array) -> float:
+    """
+    Calculate the predicted intensity for a given emissivity, temperature, and DEM.
+    
+    Parameters:
+    emis (np.array): Emissivity array
+    logt (np.array): Log temperature array
+    dem (np.array): Differential Emission Measure array
+    
+    Returns:
+    float: Predicted intensity
+    """
+    # Ensure all inputs are numpy arrays
+    emis = np.array(emis)
+    logt = np.array(logt)
+    dem = np.array(dem)
+    
+    # Calculate the temperature array
+    temp = 10**logt
+    
+    # Calculate the integrand
+    integrand = emis * dem
+    
+    # Perform the integration using the trapezoidal rule
+    intensity = np.trapz(integrand, temp)
+    
+    return intensity
+    
 def correct_metadata(map, ratio_name):
     # Correct the metadata of the map
     map.meta['measrmnt'] = 'FIP Bias'
@@ -147,9 +170,9 @@ def calc_composition_parallel(args):
     logt, emis, linenames = a.read_emissivity(ldens[ypix, xpix])
     logt_interp = interp_emis_temp(logt.value)
     emis_sorted = a.emis_filter(emis, linenames, line_databases[comp_ratio][:2])
-    int_lf = pred_intensity_compact(emis_sorted[0], logt_interp, line_databases[comp_ratio][0], dem_median[ypix, xpix])
+    int_lf = pred_intensity_compact(emis_sorted[0], logt_interp, dem_median[ypix, xpix])
     dem_scaled = dem_median[ypix, xpix] * (intensities[ypix, xpix, 0] / int_lf)
-    int_hf = pred_intensity_compact(emis_sorted[1], logt_interp, line_databases[comp_ratio][1], dem_scaled)
+    int_hf = pred_intensity_compact(emis_sorted[1], logt_interp, dem_scaled)
     fip_ratio = int_hf / intensities[ypix, xpix, 1]
     return ypix, xpix, fip_ratio
 
