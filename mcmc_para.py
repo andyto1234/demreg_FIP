@@ -47,11 +47,10 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
             mcmc_intensity = []
             mcmc_int_error = []
             mcmc_emis_sorted = []
-            mint=4
-            maxt=7.99
-            # the tresp resolution is 0.05 logt so cant use a resolution finger than that
             dlogt=0.04
-            temps=10**np.arange(mint,maxt+dlogt,dlogt)
+            mint=4 - dlogt/2
+            maxt=8.01 + dlogt/2
+            temps=10**np.arange(mint,maxt,dlogt)
 
             for ind, line in enumerate(Lines):
                 if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 10):
@@ -123,7 +122,7 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     nf = len(mcmc_emis_sorted) 
     trmatrix = np.zeros((nt,nf))
     trmatrix = np.array(mcmc_emis_sorted).T
-    
+
     dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=1000,l_emd=False,emd_int=True,gloci=1,reg_tweak=0.5,rgt_fact=1.5)
     return dem1,edem1,elogt1,chisq1,dn_reg1
 
@@ -167,7 +166,7 @@ def pred_intensity_compact(emis: np.array, logt: np.array, dem: np.array) -> flo
     emis = np.array(emis)
     logt = np.array(logt)
     dem = np.array(dem)
-    
+    print(emis.shape, logt.shape, dem.shape)
     # Calculate the temperature array
     temp = 10**logt
     
