@@ -405,7 +405,7 @@ def dem_pix(dnin, ednin, rmatrix, logt, dlogt, glc, reg_tweak=1.0, max_iter=10, 
                 elogt[kk] = (ltt[hm_mask][-1]-ltt[hm_mask][0])/2
     return dem, edem, elogt, chisq, dn_reg
 
-# @jit(nopython=True)
+@jit(nopython=True)
 def dem_reg_map(sigmaa, sigmab, U, W, data, err, reg_tweak, nmu=500):
     """
     dem_reg_map computes the regularization parameter.
