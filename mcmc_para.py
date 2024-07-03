@@ -72,7 +72,7 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
                 chi2_results.append(chi2)
             else:
                 dem_results.append(np.zeros(len(temps)))
-                chi2.append(np.inf)
+                chi2_results.append(np.inf)
 
             ycoords_out.append(ypix)
             linenames_list.append(mcmc_lines)
