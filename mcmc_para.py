@@ -13,6 +13,7 @@ from demregpy import dn2dem
 import demregpy
 
 
+
 def check_dem_exists(filename: str) -> bool:
     # Check if the DEM file exists
     from os.path import exists
@@ -107,7 +108,7 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     max_iter = 1000
     l_emd = False
     reg_tweak = 1
-    rgt_fact = 1.1
+    rgt_fact = 2
     dn_in=np.array(mcmc_intensity)
     edn_in=np.array(mcmc_int_error)
     tresp_logt = logt_interp
@@ -121,10 +122,9 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     nt = len(mcmc_emis_sorted[0])
     nf = len(mcmc_emis_sorted) 
     trmatrix = np.zeros((nt,nf))
-    for i in range(0,nf):
-        trmatrix[:,i] = mcmc_emis_sorted[i] 
+    trmatrix = np.array(mcmc_emis_sorted).T
     
-    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,emd_int=True,gloci=1,reg_tweak=reg_tweak,rgt_fact=rgt_fact)
+    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=max_iter,emd_int=True,gloci=1,reg_tweak=reg_tweak,rgt_fact=1.5)
     return dem1,edem1,elogt1,chisq1,dn_reg1
 
 

@@ -87,11 +87,11 @@ def dn2dem(dn_in, edn_in, tresp, tresp_logt, temps, reg_tweak=1.0, max_iter=10, 
 
     """
     # create our bin averages:
-    logt = ([np.mean([(np.log10(temps[i])), np.log10((temps[i+1]))]) for i in np.arange(0, len(temps)-1)])
-    # and widths
-    dlogt = (np.log10(temps[1:])-np.log10(temps[:-1]))
+    logt = np.log10(temps)
+    dlogt = logt[1:] - logt[:-1]
     nt = len(dlogt)
-    logt = (np.array([np.log10(temps[0])+(dlogt[i]*(float(i)+0.5)) for i in np.arange(nt)]))
+    logt = logt[:-1] + 0.5 * dlogt
+
     # number of DEM entries
 
     # hopefully we can deal with a variety of data, nx,ny,nf

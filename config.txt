@@ -1,1 +1,1 @@
-SO_EIS_data/eis_20071017_024748.data.h5 [processing]
+SO_EIS_data/eis_20071017_024748.data.h5

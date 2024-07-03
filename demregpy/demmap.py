@@ -6,6 +6,7 @@ import numpy as np
 from numpy.linalg import inv, pinv, svd
 from threadpoolctl import threadpool_limits
 from tqdm import tqdm
+from numba import jit
 
 
 def demmap(dd, ed, rmatrix, logt, dlogt, glc, reg_tweak=1.0, max_iter=10,
@@ -404,7 +405,7 @@ def dem_pix(dnin, ednin, rmatrix, logt, dlogt, glc, reg_tweak=1.0, max_iter=10, 
                 elogt[kk] = (ltt[hm_mask][-1]-ltt[hm_mask][0])/2
     return dem, edem, elogt, chisq, dn_reg
 
-
+# @jit(nopython=True)
 def dem_reg_map(sigmaa, sigmab, U, W, data, err, reg_tweak, nmu=500):
     """
     dem_reg_map computes the regularization parameter.
@@ -435,8 +436,8 @@ def dem_reg_map(sigmaa, sigmab, U, W, data, err, reg_tweak, nmu=500):
     nf = data.shape[0]
     nreg = sigmaa.shape[0]
 
-    arg = np.zeros([nreg, nmu])
-    discr = np.zeros([nmu])
+    arg = np.zeros((nreg, nmu))
+    discr = np.zeros((nmu))
 
     sigs = sigmaa[:nf]/sigmab[:nf]
     maxx = max(sigs)
@@ -461,7 +462,6 @@ def dem_reg_map(sigmaa, sigmab, U, W, data, err, reg_tweak, nmu=500):
     # print(opt)
 
     return opt
-
 
 def dem_inv_gsvd(A, B):
     """Perform the generalised singular value decomposition of two matrices A,B.
@@ -497,7 +497,7 @@ def dem_inv_gsvd(A, B):
     # calculate the matrix A*B^-1
     AB1 = A@inv(B)
     sze = AB1.shape
-    C = np.zeros([max(sze), max(sze)])
+    C = np.zeros((max(sze), max(sze)))
     C[:sze[0], :sze[1]] = AB1
     # use np.linalg.svd to calculate the singular value decomposition
     u, s, v = svd(C, full_matrices=True, compute_uv=True)
