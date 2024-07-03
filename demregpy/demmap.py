@@ -8,7 +8,6 @@ from threadpoolctl import threadpool_limits
 from tqdm import tqdm
 from numba import jit
 
-
 def demmap(dd, ed, rmatrix, logt, dlogt, glc, reg_tweak=1.0, max_iter=10,
            rgt_fact=1.5, dem_norm0=None, nmu=42, warn=False, l_emd=False):
     """
@@ -97,17 +96,29 @@ def demmap(dd, ed, rmatrix, logt, dlogt, glc, reg_tweak=1.0, max_iter=10,
     na = dd.shape[0]
     nf = rmatrix.shape[1]
     nt = logt.shape[0]
+    # # set up some arrays
+    # dem = np.zeros([na, nt])
+    # edem = np.zeros([na, nt])
+    # elogt = np.zeros([na, nt])
+    # np.zeros([nt, nf])
+    # np.zeros([nf, nt])
+    # np.zeros([nf, nt])
+    # chisq = np.zeros([na])
+    # np.zeros([nt, nt])
+    # dn_reg = np.zeros([na, nf])
+    # np.zeros([nf])
+
     # set up some arrays
-    dem = np.zeros([na, nt])
-    edem = np.zeros([na, nt])
-    elogt = np.zeros([na, nt])
-    np.zeros([nt, nf])
-    np.zeros([nf, nt])
-    np.zeros([nf, nt])
-    chisq = np.zeros([na])
-    np.zeros([nt, nt])
-    dn_reg = np.zeros([na, nf])
-    np.zeros([nf])
+    dem = np.zeros((na, nt))
+    edem = np.zeros((na, nt))
+    elogt = np.zeros((na, nt))
+    _ = np.zeros((nt, nf))
+    _ = np.zeros((nf, nt))
+    _ = np.zeros((nf, nt))
+    chisq = np.zeros(na)
+    _ = np.zeros((nt, nt))
+    dn_reg = np.zeros((na, nf))
+    _ = np.zeros(nf)
 
     # do we have enough DEM's to make parallel make sense?
     if (na >= 200):
@@ -522,72 +533,80 @@ def dem_inv_gsvd(A, B):
     return alpha, beta, u.T[:, :sze[0]], v.T, w2
 
 
+# def dem_inv_gsvd(A, B):
+#     """Perform the generalised singular value decomposition of two matrices A,B.
+
+#     The decomposition of the following linear equations:
+
+#         A=U*SA*W^-1
+#         B=V*SB*W^-1
+
+#     Produces gsvd matrices u,v and the weight W and diagnoal matrics SA and SB.
+
+#     Parameters
+#     ----------
+#     A : ndarray
+#         cross section matrix.
+#     B : ndarray
+#         regularisation matrix (square).
+
+
+#     Outputs
+
+#     U : ndarray
+#         decomposition product matrix.
+#     V : ndarray
+#         decomposition prodyct matrix.
+#     W : ndarray
+#         decomposition product weights.
+#     alpha : array_like
+#         the vector of the diagonal values of SA.
+#     beta : array_like
+#         the vector of the diagonal values of SB.
+#     """
+#     # calculate the matrix A*B^-1
+#     AB1 = A@inv(B)
+#     sze = AB1.shape
+#     C = np.zeros((max(sze), max(sze)))
+#     C[:sze[0], :sze[1]] = AB1
+#     # use np.linalg.svd to calculate the singular value decomposition
+#     u, s, v = svd(C, full_matrices=True, compute_uv=True)
+#     # U, S, Vh = svd(AB1, full_matrices=False)
+#     # from the svd products calculate the diagonal components form the gsvd
+#     beta = 1./np.sqrt(1+s**2)
+#     alpha = s*beta
+
+#     # diagonalise alpha and beta into SA and SB
+#     # onea=np.diag(alpha)
+#     oneb = np.diag(beta)
+#     # calculate the w matrix
+#     # w=inv(inv(onea)@transpose(u)@A)
+#     w2 = pinv(inv(oneb)@v@B)
+
+#     # return gsvd products, transposing v as we do.
+#     return alpha, beta, u.T[:, :sze[0]], v.T, w2
+
+@jit(nopython=True)
 def dem_inv_gsvd(A, B):
-    """Perform the generalised singular value decomposition of two matrices A,B.
-
-    The decomposition of the following linear equations:
-
-        A=U*SA*W^-1
-        B=V*SB*W^-1
-
-    Produces gsvd matrices u,v and the weight W and diagnoal matrics SA and SB.
-
-    Parameters
-    ----------
-    A : ndarray
-        cross section matrix.
-    B : ndarray
-        regularisation matrix (square).
-
-
-    Outputs
-
-    U : ndarray
-        decomposition product matrix.
-    V : ndarray
-        decomposition prodyct matrix.
-    W : ndarray
-        decomposition product weights.
-    alpha : array_like
-        the vector of the diagonal values of SA.
-    beta : array_like
-        the vector of the diagonal values of SB.
-    """
     # calculate the matrix A*B^-1
-    AB1 = A@inv(B)
+    AB1 = A @ inv(B)
     sze = AB1.shape
-    C = np.zeros((max(sze), max(sze)))
+    max_size = max(sze)
+    C = np.zeros((max_size, max_size))
     C[:sze[0], :sze[1]] = AB1
+    
     # use np.linalg.svd to calculate the singular value decomposition
-    u, s, v = svd(C, full_matrices=True, compute_uv=True)
-    # U, S, Vh = svd(AB1, full_matrices=False)
+    u, s, v = svd(C)
+    
     # from the svd products calculate the diagonal components form the gsvd
-    beta = 1./np.sqrt(1+s**2)
-    alpha = s*beta
+    beta = 1. / np.sqrt(1 + s**2)
+    alpha = s * beta
 
-    # diagonalise alpha and beta into SA and SB
-    # onea=np.diag(alpha)
+    # diagonalise beta into SB
     oneb = np.diag(beta)
+    
     # calculate the w matrix
-    # w=inv(inv(onea)@transpose(u)@A)
-    w2 = pinv(inv(oneb)@v@B)
+    w2 = pinv(inv(oneb) @ v @ B)
 
     # return gsvd products, transposing v as we do.
     return alpha, beta, u.T[:, :sze[0]], v.T, w2
-
-# def dem_inv_gsvd(A, B):
-#     AB1 = A @ inv(B)
-#     sze = AB1.shape
-#     C = np.zeros((max(sze), max(size)))
-#     C[:sze[0], :sze[1]] = AB1
-    
-#     # Use np.linalg.svd
-#     u, s, v = svd(C)
-    
-#     beta = 1. / np.sqrt(1 + s**2)
-#     alpha = s * beta
-    
-#     oneb = np.diag(beta)
-#     w2 = pinv(inv(oneb) @ v @ B)
-    
-#     return alpha, beta, u.T[:, :sze[0]], v.T, w2
