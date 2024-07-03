@@ -47,9 +47,11 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
             mcmc_intensity = []
             mcmc_int_error = []
             mcmc_emis_sorted = []
-            dlogt = logt_interp[1]-logt_interp[0]
-            temps=10**np.arange(np.min(logt_interp),np.max(logt_interp)+dlogt,dlogt)
-
+            mint=4
+            maxt=7.99
+            # the tresp resolution is 0.05 logt so cant use a resolution finger than that
+            dlogt=0.04
+            temps=10**np.arange(mint,maxt+dlogt,dlogt)
 
             for ind, line in enumerate(Lines):
                 if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 10):
@@ -66,12 +68,12 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
                     trmatrix[:,i] = mcmc_emis_sorted[i] 
 
                 # doing DEM calculation
-                dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp)
+                dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp,temps)
                 chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
                 dem_results.append(dem0)
                 chi2_results.append(chi2)
             else:
-                dem_results.append(np.zeros(len(temps)))
+                dem_results.append(np.zeros(len(temps)-1))
                 chi2_results.append(np.inf)
 
             ycoords_out.append(ypix)
@@ -108,7 +110,7 @@ def combine_dem_files(xdim:int, ydim:int, dir: str) -> np.array:
         lines_used[:,int(xpix_loc)] = np.array([len(line) for line in np.load(dem_file, allow_pickle=True)['lines_used']])
     return dem_combined, chi2_combined, lines_used, logt
 
-def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, logt_interp) -> float:
+def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, logt_interp, temps) -> float:
     max_iter = 1000
     l_emd = False
     reg_tweak = 1
@@ -117,12 +119,6 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     edn_in=np.array(mcmc_int_error)
     tresp_logt = logt_interp
     # set up our target dem temps
-    mint=4
-    maxt=8
-    # the tresp resolution is 0.05 logt so cant use a resolution finger than that
-    dlogt=0.04
-    temps=10**np.arange(mint,maxt+dlogt,dlogt)
-
     nt = len(mcmc_emis_sorted[0])
     nf = len(mcmc_emis_sorted) 
     trmatrix = np.zeros((nt,nf))
