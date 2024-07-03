@@ -38,7 +38,7 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
         for ypix in tqdm(range(Intensity.shape[0])):
 
             logt, emis, linenames = a.read_emissivity(ldens[ypix, xpix])
-            logt_interp = interp_emis_temp(logt.value)
+            logt_interp = np.log10(interp_emis_temp(logt.value))
             # loc = np.where((np.log10(logt_interp) >= 4) & (np.log10(logt_interp) <= 8))
             emis_sorted = a.emis_filter(emis, linenames, Lines)
             mcmc_lines = []
@@ -57,11 +57,16 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
                     mcmc_emis_sorted.append(emis_sorted[ind, :])
                     mcmc_lines.append(line)
 
+            nt = len(mcmc_emis_sorted[0])
+            nf = len(mcmc_emis_sorted) 
+            trmatrix = np.zeros((nt,nf))
+            for i in range(0,nf):
+                trmatrix[:,i] = mcmc_emis_sorted[i] 
+    
 
             # doing DEM calculation
-            dem0,edem0,elogt0,chisq0,dn_reg0=dn2dem(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp,temps)
-
-            chi2 = calc_chi2(mcmc_intensity, mcmc_int_error, dem0, mcmc_emis_sorted, logt_interp)
+            dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp)
+            chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
             dem_results.append(dem0)
             chi2_results.append(chi2)
             ycoords_out.append(ypix)
@@ -97,6 +102,31 @@ def combine_dem_files(xdim:int, ydim:int, dir: str) -> np.array:
         chi2_combined[:,int(xpix_loc)] = np.load(dem_file)['chi2'] 
         lines_used[:,int(xpix_loc)] = np.array([len(line) for line in np.load(dem_file, allow_pickle=True)['lines_used']])
     return dem_combined, chi2_combined, lines_used, logt
+
+def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, logt_interp) -> float:
+    max_iter = 1000
+    l_emd = False
+    reg_tweak = 1
+    rgt_fact = 1.1
+    dn_in=np.array(mcmc_intensity)
+    edn_in=np.array(mcmc_int_error)
+    tresp_logt = logt_interp
+    # set up our target dem temps
+    mint=4
+    maxt=7.5
+    # the tresp resolution is 0.05 logt so cant use a resolution finger than that
+    dlogt=0.05
+    temps=10**np.arange(mint,maxt+dlogt,dlogt)
+
+    nt = len(mcmc_emis_sorted[0])
+    nf = len(mcmc_emis_sorted) 
+    trmatrix = np.zeros((nt,nf))
+    for i in range(0,nf):
+        trmatrix[:,i] = mcmc_emis_sorted[i] 
+    
+    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,emd_int=True,gloci=1,reg_tweak=reg_tweak,rgt_fact=rgt_fact)
+    return dem1,edem1,elogt1,chisq1,dn_reg1
+
 
 def process_data(filename: str, num_processes: int) -> None:
     # Create an ashmcmc object with the specified filename
