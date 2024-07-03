@@ -463,6 +463,65 @@ def dem_reg_map(sigmaa, sigmab, U, W, data, err, reg_tweak, nmu=500):
 
     return opt
 
+import numpy as np
+from numba import njit
+from numpy.linalg import inv, pinv, svd
+
+@njit
+def dem_inv_gsvd(A, B):
+    """Perform the generalised singular value decomposition of two matrices A,B.
+
+    The decomposition of the following linear equations:
+
+        A=U*SA*W^-1
+        B=V*SB*W^-1
+
+    Produces gsvd matrices u,v and the weight W and diagnoal matrics SA and SB.
+
+    Parameters
+    ----------
+    A : ndarray
+        cross section matrix.
+    B : ndarray
+        regularisation matrix (square).
+
+
+    Outputs
+
+    U : ndarray
+        decomposition product matrix.
+    V : ndarray
+        decomposition prodyct matrix.
+    W : ndarray
+        decomposition product weights.
+    alpha : array_like
+        the vector of the diagonal values of SA.
+    beta : array_like
+        the vector of the diagonal values of SB.
+    """
+    # calculate the matrix A*B^-1
+    AB1 = A @ inv(B)
+    sze = AB1.shape
+    C = np.zeros((max(sze), max(sze)))
+    C[:sze[0], :sze[1]] = AB1
+    
+    # use np.linalg.svd to calculate the singular value decomposition
+    u, s, v = svd(C, full_matrices=True, compute_uv=True)
+    
+    # from the svd products calculate the diagonal components form the gsvd
+    beta = 1. / np.sqrt(1 + s**2)
+    alpha = s * beta
+
+    # diagonalise beta into SB
+    oneb = np.diag(beta)
+    
+    # calculate the W matrix
+    w2 = pinv(inv(oneb) @ v @ B)
+
+    # return gsvd products, transposing v as we do.
+    return alpha, beta, u.T[:, :sze[0]], v.T, w2
+
+
 def dem_inv_gsvd(A, B):
     """Perform the generalised singular value decomposition of two matrices A,B.
 
@@ -515,3 +574,20 @@ def dem_inv_gsvd(A, B):
 
     # return gsvd products, transposing v as we do.
     return alpha, beta, u.T[:, :sze[0]], v.T, w2
+
+# def dem_inv_gsvd(A, B):
+#     AB1 = A @ inv(B)
+#     sze = AB1.shape
+#     C = np.zeros((max(sze), max(size)))
+#     C[:sze[0], :sze[1]] = AB1
+    
+#     # Use np.linalg.svd
+#     u, s, v = svd(C)
+    
+#     beta = 1. / np.sqrt(1 + s**2)
+#     alpha = s * beta
+    
+#     oneb = np.diag(beta)
+#     w2 = pinv(inv(oneb) @ v @ B)
+    
+#     return alpha, beta, u.T[:, :sze[0]], v.T, w2

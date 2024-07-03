@@ -58,18 +58,22 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
                     mcmc_emis_sorted.append(emis_sorted[ind, :])
                     mcmc_lines.append(line)
 
-            nt = len(mcmc_emis_sorted[0])
-            nf = len(mcmc_emis_sorted) 
-            trmatrix = np.zeros((nt,nf))
-            for i in range(0,nf):
-                trmatrix[:,i] = mcmc_emis_sorted[i] 
-    
+            if mcmc_emis_sorted:
+                nt = len(mcmc_emis_sorted[0])
+                nf = len(mcmc_emis_sorted) 
+                trmatrix = np.zeros((nt,nf))
+                for i in range(0,nf):
+                    trmatrix[:,i] = mcmc_emis_sorted[i] 
 
-            # doing DEM calculation
-            dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp)
-            chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
-            dem_results.append(dem0)
-            chi2_results.append(chi2)
+                # doing DEM calculation
+                dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp)
+                chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
+                dem_results.append(dem0)
+                chi2_results.append(chi2)
+            else:
+                dem_results.append(np.zeros(len(temps)))
+                chi2.append(np.inf)
+
             ycoords_out.append(ypix)
             linenames_list.append(mcmc_lines)
 
