@@ -114,9 +114,9 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     tresp_logt = logt_interp
     # set up our target dem temps
     mint=4
-    maxt=7.5
+    maxt=8
     # the tresp resolution is 0.05 logt so cant use a resolution finger than that
-    dlogt=0.05
+    dlogt=0.04
     temps=10**np.arange(mint,maxt+dlogt,dlogt)
 
     nt = len(mcmc_emis_sorted[0])
@@ -124,7 +124,7 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     trmatrix = np.zeros((nt,nf))
     trmatrix = np.array(mcmc_emis_sorted).T
     
-    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=max_iter,emd_int=True,gloci=1,reg_tweak=reg_tweak,rgt_fact=1.5)
+    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=1000,l_emd=False,emd_int=True,gloci=1,reg_tweak=0.5,rgt_fact=1.5)
     return dem1,edem1,elogt1,chisq1,dn_reg1
 
 
