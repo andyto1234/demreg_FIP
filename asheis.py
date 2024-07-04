@@ -59,6 +59,8 @@ class asheis:
             "fe_23_263.76" : ["fe_23_263_760.1c.template.h5",0],
             "fe_24_255.10" : ["fe_24_255_100.2c.template.h5",1],
             "ca_14_193.87" :["ca_14_193_874.6c.template.h5",1],
+            "ca_15_181.90" :["ca_15_181_900.1c.template.h5",0],
+            "ca_15_200.97" :["ca_15_200_972.2c.template.h5",0],
             "ar_11_188.81" :["ar_11_188_806.3c.template.h5",2],
             "ar_14_194.40" : ["ar_14_194_396.6c.template.h5",5],
             "si_10_258.37" :["si_10_258_375.1c.template.h5",0],
@@ -167,12 +169,18 @@ class asheis:
         import numpy as np
         from astropy.visualization import ImageNormalize
         import astropy.units as u
+        try:
+            density_ratios = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_rat']
+            density_values = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_den']
+            m_nom = self.get_intensity('fe_13_203.83', outdir, plot=False, **kwargs)
+            m_denom = self.get_intensity('fe_13_202.04', outdir, plot=False, **kwargs)
+        except:
+            print('-------------Fe XIII Density ratio file not found. Using Ca XV ratios instead-------------')
+            density_ratios = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_rat']
+            density_values = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_den']
+            m_nom = self.get_intensity('ca_15_181.90', outdir, plot=False, **kwargs)
+            m_denom = self.get_intensity('ca_15_200.97', outdir, plot=False, **kwargs)
 
-        density_ratios = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_rat']
-        density_values = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_den']
-
-        m_nom = self.get_intensity('fe_13_203.83', outdir, plot=False, **kwargs)
-        m_denom = self.get_intensity('fe_13_202.04', outdir, plot=False, **kwargs)
         obs_ratio = m_nom.data / m_denom.data
 
         for i in range(obs_ratio.shape[0]):

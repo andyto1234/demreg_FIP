@@ -47,15 +47,25 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
             mcmc_intensity = []
             mcmc_int_error = []
             mcmc_emis_sorted = []
+            # Original parameters
+            original_dlogt = 0.04
+            original_mint = 4 - original_dlogt/2
+            original_maxt = 8.01 + original_dlogt/2
+            original_temps = 10**np.arange(original_mint, original_maxt, original_dlogt)
+
             dlogt=0.04
-            mint=4 - dlogt/2
-            maxt=8.01 + dlogt/2
+            mint=5.3 - dlogt/2
+            maxt=7.3 + dlogt/2
             temps=10**np.arange(mint,maxt,dlogt)
 
+            start_index = np.searchsorted(original_temps, temps[0])
+            end_index = np.searchsorted(original_temps, temps[-1], side='right')
+
             for ind, line in enumerate(Lines):
-                if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 10):
+                if (line[:2] == 'fe') and (Intensity[ypix, xpix, ind] > 5):
                     mcmc_intensity.append(Intensity[ypix, xpix, ind])
                     mcmc_int_error.append(Int_error[ypix, xpix,ind]+Intensity[ypix, xpix,ind]*0.23)
+                    # mcmc_int_error.append(Intensity[ypix, xpix,ind]*0.2)
                     mcmc_emis_sorted.append(emis_sorted[ind, :])
                     mcmc_lines.append(line)
 
@@ -67,12 +77,17 @@ def process_pixel(args: tuple[int, np.ndarray, np.ndarray, list[str], np.ndarray
                     trmatrix[:,i] = mcmc_emis_sorted[i] 
 
                 # doing DEM calculation
-                dem0,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp,temps)
-                chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
+                dem,edem0,elogt0,chisq0,dn_reg0=demreg_process_wrapper(np.array(mcmc_intensity),np.array(mcmc_int_error),np.array(mcmc_emis_sorted),logt_interp,temps)
+                dem0 = np.zeros(len(original_temps) - 1)
+                # Fill in the calculated DEM values at the correct indices
+                dem0[start_index:end_index] = dem
+
+                chi2 = np.sum(((pred_intensity_compact(mcmc_emis_sorted, logt, dem0) - np.array(mcmc_intensity))/np.array(mcmc_int_error))**2)
+                # chi2 = calc_chi2(dn_reg0, np.array(mcmc_intensity), np.array(mcmc_int_error))
                 dem_results.append(dem0)
                 chi2_results.append(chi2)
             else:
-                dem_results.append(np.zeros(len(temps)-1))
+                dem_results.append(np.zeros(len(original_temps)-1))
                 chi2_results.append(np.inf)
 
             ycoords_out.append(ypix)
@@ -122,8 +137,9 @@ def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, log
     nf = len(mcmc_emis_sorted) 
     trmatrix = np.zeros((nt,nf))
     trmatrix = np.array(mcmc_emis_sorted).T
+    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=1000,l_emd=True,emd_int=True,gloci=1,reg_tweak=0.001,rgt_fact=1.05)
 
-    dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=1000,l_emd=False,emd_int=True,gloci=1,reg_tweak=0.5,rgt_fact=1.5)
+    # dem1,edem1,elogt1,chisq1,dn_reg1=dn2dem(dn_in,edn_in,trmatrix,tresp_logt,temps,max_iter=1000,l_emd=True,emd_int=True,gloci=1,reg_tweak=0.3,rgt_fact=1.01)
     return dem1,edem1,elogt1,chisq1,dn_reg1
 
 
@@ -166,9 +182,9 @@ def pred_intensity_compact(emis: np.array, logt: np.array, dem: np.array) -> flo
     emis = np.array(emis)
     logt = np.array(logt)
     dem = np.array(dem)
-    print(emis.shape, logt.shape, dem.shape)
+    # print(emis.shape, logt.shape, dem.shape)
     # Calculate the temperature array
-    temp = 10**logt
+    temp = logt
     
     # Calculate the integrand
     integrand = emis * dem
@@ -206,33 +222,36 @@ def calc_composition(filename, np_file, line_databases, num_processes):
     dem_median = dem_data['dem_combined']
 
     for comp_ratio in line_databases:
-        intensities = np.zeros((ldens.shape[0], ldens.shape[1], 2))
-        composition = np.zeros_like(ldens)
+        try:
+            intensities = np.zeros((ldens.shape[0], ldens.shape[1], 2))
+            composition = np.zeros_like(ldens)
 
-        # Read the intensity maps for the composition lines
-        for num, fip_line in enumerate(line_databases[comp_ratio][:2]):
-            print('getting intensity \n')
-            map = a.ash.get_intensity(fip_line, outdir=a.outdir, plot=False, calib=True)
-            intensities[:, :, num] = map.data
+            # Read the intensity maps for the composition lines
+            for num, fip_line in enumerate(line_databases[comp_ratio][:2]):
+                print('getting intensity \n')
+                map = a.ash.get_intensity(fip_line, outdir=a.outdir, plot=False, calib=True)
+                intensities[:, :, num] = map.data
 
-        # Create argument list for parallel processing
-        args_list = [(ypix, xpix, ldens, dem_median, intensities, line_databases, comp_ratio, a)
-                     for ypix, xpix in np.ndindex(ldens.shape)]
+            # Create argument list for parallel processing
+            args_list = [(ypix, xpix, ldens, dem_median, intensities, line_databases, comp_ratio, a)
+                        for ypix, xpix in np.ndindex(ldens.shape)]
 
-        # Create a pool of worker processes
-        with Pool(processes=num_processes) as pool:
-            results = pool.map(calc_composition_parallel, args_list)
+            # Create a pool of worker processes
+            with Pool(processes=num_processes) as pool:
+                results = pool.map(calc_composition_parallel, args_list)
 
-        # Update composition array with the results
-        for ypix, xpix, fip_ratio in results:
-            composition[ypix, xpix] = fip_ratio
+            # Update composition array with the results
+            for ypix, xpix, fip_ratio in results:
+                composition[ypix, xpix] = fip_ratio
 
-        np.savez(f'{a.outdir}/{a.outdir.split("/")[-1]}_composition_{comp_ratio}.npz',
-                 composition=composition, chi2=dem_data['chi2_combined'], no_lines=dem_data['lines_used'])
+            np.savez(f'{a.outdir}/{a.outdir.split("/")[-1]}_composition_{comp_ratio}.npz',
+                    composition=composition, chi2=dem_data['chi2_combined'], no_lines=dem_data['lines_used'])
 
-        map_fip = Map(composition, map.meta)
-        map_fip = correct_metadata(map_fip, comp_ratio)
-        map_fip.save(f'{a.outdir}/{a.outdir.split("/")[-1]}_{comp_ratio}.fits', overwrite=True)
+            map_fip = Map(composition, map.meta)
+            map_fip = correct_metadata(map_fip, comp_ratio)
+            map_fip.save(f'{a.outdir}/{a.outdir.split("/")[-1]}_{comp_ratio}.fits', overwrite=True)
+        except:
+            pass
 
 
 import os
@@ -287,7 +306,8 @@ if __name__ == "__main__":
             print(f"Processed: {filename}")
             line_databases = {
                 "sis": ['si_10_258.37', 's_10_264.23', 'SiX_SX'],
-                # "CaAr": ['ca_14_193.87', 'ar_14_194.40', 'CaXIV_ArXIV'],
+                "CaAr": ['ca_14_193.87', 'ar_14_194.40', 'CaXIV_ArXIV'],
+                "FeS": ['fe_16_262.98', 's_13_256.69', 'FeXVI_SXIII'],
             }
             calc_composition(filename, np_file, line_databases, args.cores)
 
