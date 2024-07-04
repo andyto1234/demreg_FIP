@@ -2,3 +2,15 @@ SO_EIS_data/eis_20071017_024748.data.h5 [processed]
 SO_EIS_data/eis_20170910_160016.data.h5 [processed]
 SO_EIS_data/eis_20170910_164452.data.h5 [processed]
 SO_EIS_data/eis_20170910_183908.data.h5 [processed]
+SO_EIS_data/eis_20190410_053643.data.h5 [processing]
+SO_EIS_data/eis_20190411_153213.data.h5
+SO_EIS_data/eis_20190412_151809.data.h5
+SO_EIS_data/eis_20190413_101941.data.h5
+SO_EIS_data/eis_20190415_184712.data.h5
+SO_EIS_data/eis_20190415_202412.data.h5
+SO_EIS_data/eis_20190416_024012.data.h5
+SO_EIS_data/eis_20190417_013743.data.h5
+SO_EIS_data/eis_20190417_164240.data.h5
+SO_EIS_data/eis_20190418_021343.data.h5
+SO_EIS_data/eis_20190419_042513.data.h5
+SO_EIS_data/eis_20190419_161400.data.h5
