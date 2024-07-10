@@ -11,6 +11,7 @@ import platform
 from mcmc.mcmc_utils import calc_chi2
 from demregpy import dn2dem
 import demregpy
+import shutil
 
 
 
@@ -103,7 +104,7 @@ def download_data(filename: str) -> None:
     from eispac.download import download_hdf5_data
     download_hdf5_data(filename.split('/')[-1], local_top='SO_EIS_data', overwrite=False)
 
-def combine_dem_files(xdim:int, ydim:int, dir: str) -> np.array:
+def combine_dem_files(xdim:int, ydim:int, dir: str, delete=False) -> np.array:
     from glob import glob
     from re import search
 
@@ -122,6 +123,14 @@ def combine_dem_files(xdim:int, ydim:int, dir: str) -> np.array:
         dem_combined[:,int(xpix_loc), :] = np.load(dem_file)['dem_results'] 
         chi2_combined[:,int(xpix_loc)] = np.load(dem_file)['chi2'] 
         lines_used[:,int(xpix_loc)] = np.array([len(line) for line in np.load(dem_file, allow_pickle=True)['lines_used']])
+
+    directory_to_delete = os.path.join(dir, 'dem_columns')
+    if os.path.exists(directory_to_delete):
+        shutil.rmtree(directory_to_delete)
+        print(f'Directory {directory_to_delete} has been deleted successfully.')
+    else:
+        print(f'Directory {directory_to_delete} does not exist.')
+
     return dem_combined, chi2_combined, lines_used, logt
 
 def demreg_process_wrapper(mcmc_intensity, mcmc_int_error, mcmc_emis_sorted, logt_interp, temps) -> float:
@@ -161,7 +170,7 @@ def process_data(filename: str, num_processes: int) -> None:
 
     # Combine the DEM files into a single array
     print('------------------------------Combining DEM files------------------------------')
-    dem_combined, chi2_combined, lines_used, logt = combine_dem_files(Intensity.shape[1], Intensity.shape[0], a.outdir)
+    dem_combined, chi2_combined, lines_used, logt = combine_dem_files(Intensity.shape[1], Intensity.shape[0], a.outdir, delete=True)
     np.savez(f'{a.outdir}/{a.outdir.split("/")[-1]}_dem_combined.npz', dem_combined=dem_combined, chi2_combined=chi2_combined, lines_used=lines_used, logt=logt)
     
     return f'{a.outdir}/{a.outdir.split("/")[-1]}_dem_combined.npz'
@@ -213,6 +222,18 @@ def calc_composition_parallel(args):
     return ypix, xpix, fip_ratio
 
 def calc_composition(filename, np_file, line_databases, num_processes):
+    """
+    Calculate the composition of a given file using multiprocessing.
+
+    Parameters:
+    - filename (str): The name of the file to calculate the composition for.
+    - np_file (str): The name of the numpy file containing the DEM data.
+    - line_databases (dict): A dictionary containing line databases for different composition ratios.
+    - num_processes (int): The number of processes to use for parallel processing.
+
+    Returns:
+    None
+    """
     from sunpy.map import Map
     from multiprocessing import Pool
 
