@@ -169,25 +169,35 @@ class asheis:
         import numpy as np
         from astropy.visualization import ImageNormalize
         import astropy.units as u
+        use_default = False
         try:
             density_ratios = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_rat']
             density_values = readsav(f'{self.dens_dir}/density_ratios_fe_13_203_82_202_04_.sav')['smooth_den']
             m_nom = self.get_intensity('fe_13_203.83', outdir, plot=False, **kwargs)
             m_denom = self.get_intensity('fe_13_202.04', outdir, plot=False, **kwargs)
         except:
-            print('-------------Fe XIII Density ratio file not found. Using Ca XV ratios instead-------------')
-            density_ratios = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_rat']
-            density_values = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_den']
-            m_nom = self.get_intensity('ca_15_181.90', outdir, plot=False, **kwargs)
-            m_denom = self.get_intensity('ca_15_200.97', outdir, plot=False, **kwargs)
+            try:
+                print('-------------Fe XIII Density ratio file not found. Using Ca XV ratios instead-------------')
+                density_ratios = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_rat']
+                density_values = readsav(f'{self.dens_dir}/density_ratios_ca_15_181_90_200_97_.sav')['smooth_den']
+                m_nom = self.get_intensity('ca_15_181.90', outdir, plot=False, **kwargs)
+                m_denom = self.get_intensity('ca_15_200.97', outdir, plot=False, **kwargs)
+            except:
+                print('-------------Neither Fe XIII nor Ca XV Density ratio files found. Using default values-------------')
+                use_default = True
+                # We'll use m_nom to get the dimensions and metadata, but we'll fill it with default values
+                m_nom = self.get_intensity('fe_12_195.12', outdir, plot=False, **kwargs)
 
-        obs_ratio = m_nom.data / m_denom.data
+        if not use_default:
+            obs_ratio = m_nom.data / m_denom.data
 
-        for i in range(obs_ratio.shape[0]):
-            for j in range(obs_ratio.shape[1]):
-                obs = obs_ratio[i, j]
-                closest_index = np.argmin(np.abs(density_ratios - obs))
-                obs_ratio[i, j] = density_values[closest_index]
+            for i in range(obs_ratio.shape[0]):
+                for j in range(obs_ratio.shape[1]):
+                    obs = obs_ratio[i, j]
+                    closest_index = np.argmin(np.abs(density_ratios - obs))
+                    obs_ratio[i, j] = density_values[closest_index]
+        else:
+            obs_ratio = np.full_like(m_nom.data, 9.0)
 
         m = sunpy.map.Map(obs_ratio, m_nom.meta)
         m.meta['measrmnt'] = 'density'
